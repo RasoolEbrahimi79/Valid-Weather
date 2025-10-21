@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:valid_weather/models/city_suggestion.dart';
+import 'package:valid_weather/models/weather_data.dart';
 import 'package:valid_weather/services/weather_service.dart';
 
 class MainScreen extends StatefulWidget {
@@ -13,7 +14,28 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _controller = TextEditingController();
   String? _errorText;
+  WeatherData? _weatherData;
+  bool _isLoading = false;
   final WeatherService _weatherService = WeatherService();
+
+  Future<void> _fetchWeather(double lat, double lon) async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final weather = await _weatherService.fetchWeather(lat, lon);
+      setState(() {
+        _weatherData = weather;
+        _isLoading = false;
+        _errorText = null;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorText = 'Error fetching weather: $e';
+      });
+    }
+  }
 
   void _validateInput(String value) {
     setState(() {
@@ -33,14 +55,15 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         title: const Text('Valid Weather'),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer, // Dark theme surface
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0), // Material 3 spacing: 16dp
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Top Section: City Name TextField with Suggestions
               TypeAheadField<CitySuggestion>(
                 controller: _controller,
                 suggestionsCallback: (pattern) async {
@@ -57,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: BorderRadius.circular(12.0), // Material 3: rounded corners
                       ),
                       filled: true,
                       fillColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -75,6 +98,7 @@ class _MainScreenState extends State<MainScreen> {
                                 setState(() {
                                   _controller.clear();
                                   _errorText = null;
+                                  _weatherData = null;
                                 });
                               },
                             )
@@ -94,6 +118,7 @@ class _MainScreenState extends State<MainScreen> {
                 onSelected: (CitySuggestion suggestion) {
                   _controller.text = '${suggestion.name}, ${suggestion.country}';
                   _validateInput(_controller.text);
+                  _fetchWeather(suggestion.lat, suggestion.lon);
                 },
                 loadingBuilder: (context) => const SizedBox(
                   height: 60,
@@ -112,47 +137,77 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
               ),
+              // Center Section: Weather Data
               Expanded(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Current Temperature Here',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
+                  child: _isLoading
+                      ? const CircularProgressIndicator()
+                      : _weatherData != null
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _weatherData!.temperature,
+                                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                ),
+                                const SizedBox(height: 8.0), // Material 3 spacing
+                                Text(
+                                  _weatherData!.condition,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 8.0),
+                                Text(
+                                  'Max: ${_weatherData!.maxTemperature} | Min: ${_weatherData!.minTemperature}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 8.0),
+                                Text(
+                                  '${_weatherData!.humidity} | ${_weatherData!.wind}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '25°C', // Placeholder for temperature
+                                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                ),
+                                const SizedBox(height: 8.0), // Material 3 spacing
+                                Text(
+                                  'Sunny', // Placeholder for weather condition
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 8.0),
+                                Text(
+                                  'Max: 28°C | Min: 22°C', // Placeholder for max/min
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 8.0),
+                                Text(
+                                  'Humidity: 60% | Wind: 10 km/h', // Placeholder for additional info
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
                             ),
-                      ),
-                      const SizedBox(height: 8.0),
-                      Text(
-                        'Weather Condition Here',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8.0),
-                      Text(
-                        'Max Temp  | Min Temp',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 8.0),
-                      Text(
-                        'Humidity % | Wind Speed',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
                 ),
               ),
+              // Bottom Section: Placeholder Icon
               Container(
-                height: 150,
+                height: 150, // Fixed height for placeholder
                 alignment: Alignment.bottomCenter,
-                child: Text(
-                        'SVG Here',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                      ),
+                child: Icon(
+                  Icons.wb_sunny, // Placeholder for weather icon
+                  size: 100,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
             ],
           ),
