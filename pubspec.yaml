@@ -36,6 +36,7 @@ dependencies:
   shared_preferences: ^2.5.3
   sqflite: ^2.4.2
   flutter_typeahead: ^5.2.0
+  flutter_native_splash: ^2.4.7
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -63,8 +64,8 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
+  assets:
+    - assets/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
@@ -92,3 +93,39 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# flutter_native_splash:
+#   color: "#000000"
+#   image: assets/splash.png
+#   android_12:
+#     image: assets/splash.png
+#     image_dark: assets/splash.png
+#     icon_background_color: "#000000"
+#   fullscreen: true
+flutter_native_splash:
+  # Background (mutually exclusive with background_image)
+  color: "#0d0e0f"  # Or your preferred hex color
+
+  # Your logo image
+  image: assets/splash.png  # High-res PNG from step 1
+
+  # Fitting options to prevent stretching/cropping
+  android_gravity: center  # Options: center (default), fill_horizontal, fill_vertical, etc. Use 'fill_horizontal|clip_vertical' if logo is wide.
+  ios_content_mode: scaleAspectFit  # Preserves aspect ratio without stretching (default: center). Alternatives: scaleAspectFill (crops to fill), scaleToFill (stretches).
+  web_image_mode: contain  # For web: contain (fits without cropping), cover (crops to cover).
+
+  # Dark mode (if needed for quality consistency)
+  image_dark: assets/splash.png
+  color_dark: "#0d0e0f"
+
+  # Android 12+ specific (critical if your app targets API 31+ – this clips to a circle, which might explain fitting/quality issues)
+  android_12:
+    image: assets/splash.png  # Separate 1152x1152 PNG; ensure key elements fit in a 768px diameter circle (center content, add padding if needed).
+    color: "#0d0e0f"  # No background_image support here.
+
+  # Other options
+  fullscreen: true  # Ensures full-screen coverage without bars
+  android: true
+  ios: true
+  web: true
+  
