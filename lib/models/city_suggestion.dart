@@ -14,12 +14,28 @@ class CitySuggestion {
   });
 
   factory CitySuggestion.fromJson(Map<String, dynamic> json) {
+    print('Parsing city JSON: $json');
     return CitySuggestion(
-      name: json['city'] ?? '',
-      country: json['country'] ?? '',
-      lat: (json['latitude'] as num).toDouble(),
-      lon: (json['longitude'] as num).toDouble(),
-      population: json['population'],
+      name: json['city'] ?? json['name'] ?? 'Unknown',
+      country: json['country'] ?? json['countryCode'] ?? 'Unknown',
+      lat: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      lon: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      population: json['population'] as int?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'country': country,
+      'latitude': lat,
+      'longitude': lon,
+      'population': population,
+    };
+  }
+
+  @override
+  String toString() {
+    return 'CitySuggestion(name: $name, country: $country, lat: $lat, lon: $lon, population: $population)';
   }
 }
