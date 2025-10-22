@@ -260,13 +260,27 @@ class _MainScreenState extends State<MainScreen> {
               Container(
                 height: 150,
                 alignment: Alignment.bottomCenter,
-                child: SvgPicture.asset(
-                  _weatherData == null
-                      ? 'assets/icons/sunny.svg'
-                      : _weatherService.getWeatherIcon(_weatherData!.weatherCode, _weatherData!.windSpeed),
-                  width: 100,
-                  height: 100,
-                  
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  child: SvgPicture.asset(
+                    _weatherData == null
+                        ? 'assets/icons/sunny.svg'
+                        : _weatherService.getWeatherIcon(_weatherData!.weatherCode, _weatherData!.windSpeed),
+                    key: ValueKey<String>(
+                      _weatherData == null
+                          ? 'sunny'
+                          : _weatherService.getWeatherIcon(_weatherData!.weatherCode, _weatherData!.windSpeed),
+                    ),
+                    width: 100,
+                    height: 100,
+                    colorFilter: ColorFilter.mode(
+                      Theme.of(context).colorScheme.primary,
+                      BlendMode.srcIn,
+                    ),
+                  ),
                 ),
               ),
             ],
