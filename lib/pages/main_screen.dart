@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:valid_weather/models/city_suggestion.dart';
 import 'package:valid_weather/models/weather_data.dart';
+import 'package:valid_weather/services/database_helper.dart';
 import 'package:valid_weather/services/weather_service.dart';
 
 class MainScreen extends StatefulWidget {
@@ -14,73 +17,129 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _controller = TextEditingController();
   String? _errorText;
+  final WeatherService _weatherService = WeatherService();
+  final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
+  Timer? _debounce;
   WeatherData? _weatherData;
   bool _isLoading = false;
-  final WeatherService _weatherService = WeatherService();
+  String _unit = 'metric'; // Default to metric
 
-  Future<void> _fetchWeather(double lat, double lon) async {
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final unit = await _databaseHelper.getUnitPreference();
     setState(() {
-      _isLoading = true;
+      _unit = unit;
     });
-    try {
-      final weather = await _weatherService.fetchWeather(lat, lon);
-      setState(() {
-        _weatherData = weather;
-        _isLoading = false;
-        _errorText = null;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorText = 'Error fetching weather: $e';
-      });
-    }
   }
 
   void _validateInput(String value) {
-    setState(() {
-      _errorText = value.isEmpty ? 'City name cannot be empty' : null;
+    print('Validating input: $value');
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      setState(() {
+        _errorText = value.isEmpty ? 'City name cannot be empty' : null;
+      });
     });
+  }
+
+  Future<void> _fetchWeather(CitySuggestion suggestion) async {
+    setState(() {
+      _isLoading = true;
+    });
+    final weather = await _weatherService.getWeatherData(suggestion.lat, suggestion.lon);
+    setState(() {
+      _weatherData = weather;
+      _isLoading = false;
+    });
+  }
+
+  void _toggleUnit(bool isMetric) async {
+    setState(() {
+      _unit = isMetric ? 'metric' : 'imperial';
+    });
+    await _databaseHelper.saveUnitPreference(_unit);
+    print('Toggled unit to: $_unit');
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
+    _databaseHelper.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    print('Building MainScreen');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Valid Weather'),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainer, // Dark theme surface
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+        actions: [
+          Row(
+            children: [
+              Text(
+                '°F',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _unit == 'imperial'
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              Switch(
+                value: _unit == 'metric',
+                onChanged: _toggleUnit,
+                activeColor: Theme.of(context).colorScheme.primary,
+              ),
+              Text(
+                '°C',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _unit == 'mstric'
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0), // Material 3 spacing: 16dp
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Top Section: City Name TextField with Suggestions
               TypeAheadField<CitySuggestion>(
                 controller: _controller,
                 suggestionsCallback: (pattern) async {
-                  return await _weatherService.getCitySuggestions(pattern);
+                  print('SuggestionsCallback triggered for: $pattern');
+                  final suggestions = await _weatherService.getCitySuggestions(pattern);
+                  print('Suggestions returned: $suggestions');
+                  return suggestions;
                 },
                 builder: (context, controller, focusNode) {
+                  print('Building TextField');
                   return TextField(
                     controller: controller,
                     focusNode: focusNode,
-                    onChanged: _validateInput,
+                    onChanged: (value) {
+                      print('TextField changed: $value');
+                      _validateInput(value);
+                    },
                     decoration: InputDecoration(
                       labelText: 'City Name',
                       labelStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.0), // Material 3: rounded corners
+                        borderRadius: BorderRadius.circular(12.0),
                       ),
                       filled: true,
                       fillColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -95,6 +154,7 @@ class _MainScreenState extends State<MainScreen> {
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                               onPressed: () {
+                                print('Clear button pressed');
                                 setState(() {
                                   _controller.clear();
                                   _errorText = null;
@@ -109,6 +169,7 @@ class _MainScreenState extends State<MainScreen> {
                   );
                 },
                 itemBuilder: (context, CitySuggestion suggestion) {
+                  print('Rendering suggestion: ${suggestion.name}, ${suggestion.country}');
                   return ListTile(
                     title: Text(suggestion.name),
                     subtitle: Text(suggestion.country),
@@ -116,97 +177,97 @@ class _MainScreenState extends State<MainScreen> {
                   );
                 },
                 onSelected: (CitySuggestion suggestion) {
+                  print('Selected suggestion: ${suggestion.name}, ${suggestion.country}');
                   _controller.text = '${suggestion.name}, ${suggestion.country}';
                   _validateInput(_controller.text);
-                  _fetchWeather(suggestion.lat, suggestion.lon);
+                  _fetchWeather(suggestion);
                 },
-                loadingBuilder: (context) => const SizedBox(
-                  height: 60,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                errorBuilder: (context, error) => const SizedBox(
-                  height: 100,
-                  child: Center(
-                    child: Text('Error fetching suggestions', style: TextStyle(color: Colors.grey)),
-                  ),
-                ),
-                emptyBuilder: (context) => const SizedBox(
-                  height: 100,
-                  child: Center(
-                    child: Text('No cities found', style: TextStyle(color: Colors.grey)),
-                  ),
-                ),
+                loadingBuilder: (context) {
+                  print('Showing loading indicator');
+                  return const SizedBox(
+                    height: 60,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error) {
+                  print('TypeAhead error: $error');
+                  return const SizedBox(
+                    height: 100,
+                    child: Center(
+                      child: Text('Error fetching suggestions', style: TextStyle(color: Colors.grey)),
+                    ),
+                  );
+                },
+                emptyBuilder: (context) {
+                  print('No suggestions found');
+                  return const SizedBox(
+                    height: 100,
+                    child: Center(
+                      child: Text('No cities found', style: TextStyle(color: Colors.grey)),
+                    ),
+                  );
+                },
               ),
-              // Center Section: Weather Data
+              // ElevatedButton(
+              //   onPressed: () async {
+              //     print('Test API button pressed');
+              //     final suggestions = await _weatherService.getCitySuggestions('Lon');
+              //     print('Manual test suggestions: $suggestions');
+              //     ScaffoldMessenger.of(context).showSnackBar(
+              //       SnackBar(content: Text('Found ${suggestions.length} cities')),
+              //     );
+              //   },
+              //   child: const Text('Test API'),
+              // ),
               Expanded(
                 child: Center(
                   child: _isLoading
                       ? const CircularProgressIndicator()
-                      : _weatherData != null
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _weatherData!.temperature,
-                                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).colorScheme.primary,
-                                      ),
-                                ),
-                                const SizedBox(height: 8.0), // Material 3 spacing
-                                Text(
-                                  _weatherData!.condition,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 8.0),
-                                Text(
-                                  'Max: ${_weatherData!.maxTemperature} | Min: ${_weatherData!.minTemperature}',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                const SizedBox(height: 8.0),
-                                Text(
-                                  '${_weatherData!.humidity} | ${_weatherData!.wind}',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              ],
+                      : _weatherData == null
+                          ? Text(
+                              'Select a city to view weather',
+                              style: Theme.of(context).textTheme.bodyLarge,
                             )
                           : Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  '25°C', // Placeholder for temperature
+                                  '${_weatherData!.getTemperature(_unit).toStringAsFixed(1)}${_weatherData!.getTemperatureUnit(_unit)}',
                                   style: Theme.of(context).textTheme.displayMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: Theme.of(context).colorScheme.primary,
                                       ),
                                 ),
-                                const SizedBox(height: 8.0), // Material 3 spacing
+                                const SizedBox(height: 8.0),
                                 Text(
-                                  'Sunny', // Placeholder for weather condition
+                                  _weatherService.getWeatherIcon(_weatherData!.weatherCode, _weatherData!.windSpeed).split('/').last.replaceAll('.svg', '').toUpperCase(),
                                   style: Theme.of(context).textTheme.titleLarge,
                                 ),
                                 const SizedBox(height: 8.0),
                                 Text(
-                                  'Max: 28°C | Min: 22°C', // Placeholder for max/min
+                                  'Max: ${_weatherData!.getMaxTemp(_unit).toStringAsFixed(1)}${_weatherData!.getTemperatureUnit(_unit)} | Min: ${_weatherData!.getMinTemp(_unit).toStringAsFixed(1)}${_weatherData!.getTemperatureUnit(_unit)}',
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                                 const SizedBox(height: 8.0),
                                 Text(
-                                  'Humidity: 60% | Wind: 10 km/h', // Placeholder for additional info
+                                  'Humidity: ${_weatherData!.humidity}% | Wind: ${_weatherData!.getWindSpeed(_unit).toStringAsFixed(1)} ${_weatherData!.getWindSpeedUnit(_unit)}',
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               ],
                             ),
                 ),
               ),
-              // Bottom Section: Placeholder Icon
               Container(
-                height: 150, // Fixed height for placeholder
+                height: 150,
                 alignment: Alignment.bottomCenter,
-                child: Icon(
-                  Icons.wb_sunny, // Placeholder for weather icon
-                  size: 100,
-                  color: Theme.of(context).colorScheme.primary,
+                child: SvgPicture.asset(
+                  'assets/icons/sunny.svg',
+                  width: 100,
+                  height: 100,
+                  colorFilter: ColorFilter.mode(
+                    Theme.of(context).colorScheme.primary,
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
             ],
