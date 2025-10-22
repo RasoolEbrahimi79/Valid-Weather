@@ -22,7 +22,7 @@ class _MainScreenState extends State<MainScreen> {
   Timer? _debounce;
   WeatherData? _weatherData;
   bool _isLoading = false;
-  String _unit = 'metric'; // Default to metric
+  String _unit = 'metric';
 
   @override
   void initState() {
@@ -86,9 +86,9 @@ class _MainScreenState extends State<MainScreen> {
           Row(
             children: [
               Text(
-                '°F',
+                '°C',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: _unit == 'imperial'
+                      color: _unit == 'metric'
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -99,9 +99,9 @@ class _MainScreenState extends State<MainScreen> {
                 activeColor: Theme.of(context).colorScheme.primary,
               ),
               Text(
-                '°C',
+                '°F',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: _unit == 'mstric'
+                      color: _unit == 'imperial'
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -208,17 +208,17 @@ class _MainScreenState extends State<MainScreen> {
                   );
                 },
               ),
-              // ElevatedButton(
-              //   onPressed: () async {
-              //     print('Test API button pressed');
-              //     final suggestions = await _weatherService.getCitySuggestions('Lon');
-              //     print('Manual test suggestions: $suggestions');
-              //     ScaffoldMessenger.of(context).showSnackBar(
-              //       SnackBar(content: Text('Found ${suggestions.length} cities')),
-              //     );
-              //   },
-              //   child: const Text('Test API'),
-              // ),
+              ElevatedButton(
+                onPressed: () async {
+                  print('Test API button pressed');
+                  final suggestions = await _weatherService.getCitySuggestions('Lon');
+                  print('Manual test suggestions: $suggestions');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Found ${suggestions.length} cities')),
+                  );
+                },
+                child: const Text('Test API'),
+              ),
               Expanded(
                 child: Center(
                   child: _isLoading
@@ -261,7 +261,9 @@ class _MainScreenState extends State<MainScreen> {
                 height: 150,
                 alignment: Alignment.bottomCenter,
                 child: SvgPicture.asset(
-                  'assets/icons/sunny.svg',
+                  _weatherData == null
+                      ? 'assets/icons/sunny.svg'
+                      : _weatherService.getWeatherIcon(_weatherData!.weatherCode, _weatherData!.windSpeed),
                   width: 100,
                   height: 100,
                   colorFilter: ColorFilter.mode(
