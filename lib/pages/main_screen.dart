@@ -276,10 +276,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     width: 100,
                     height: 100,
-                    colorFilter: ColorFilter.mode(
-                      Theme.of(context).colorScheme.primary,
-                      BlendMode.srcIn,
-                    ),
+                    
                   ),
                 ),
               ),
