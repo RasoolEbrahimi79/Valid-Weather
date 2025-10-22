@@ -266,10 +266,7 @@ class _MainScreenState extends State<MainScreen> {
                       : _weatherService.getWeatherIcon(_weatherData!.weatherCode, _weatherData!.windSpeed),
                   width: 100,
                   height: 100,
-                  colorFilter: ColorFilter.mode(
-                    Theme.of(context).colorScheme.primary,
-                    BlendMode.srcIn,
-                  ),
+                  
                 ),
               ),
             ],
