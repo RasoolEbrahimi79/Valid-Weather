@@ -22,6 +22,7 @@ class _MainScreenState extends State<MainScreen> {
   Timer? _debounce;
   WeatherData? _weatherData;
   bool _isLoading = false;
+  CitySuggestion? _lastCity;
   String _unit = 'metric';
 
   @override
@@ -31,10 +32,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _loadPreferences() async {
+    final city = await _databaseHelper.getLastCity();
     final unit = await _databaseHelper.getUnitPreference();
     setState(() {
       _unit = unit;
+      _lastCity = city;
+      if (city != null) {
+        _controller.text = '${city.name}, ${city.country}';
+      }
     });
+    if (city != null) {
+      await _fetchWeather(city);
+    }
   }
 
   void _validateInput(String value) {
@@ -52,8 +61,10 @@ class _MainScreenState extends State<MainScreen> {
       _isLoading = true;
     });
     final weather = await _weatherService.getWeatherData(suggestion.lat, suggestion.lon);
+    await _databaseHelper.saveLastCity(suggestion);
     setState(() {
       _weatherData = weather;
+      _lastCity = suggestion;
       _isLoading = false;
     });
   }
@@ -82,33 +93,6 @@ class _MainScreenState extends State<MainScreen> {
         title: const Text('Valid Weather'),
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-        actions: [
-          Row(
-            children: [
-              Text(
-                '°C',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: _unit == 'metric'
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              Switch(
-                value: _unit == 'metric',
-                onChanged: _toggleUnit,
-                activeColor: Theme.of(context).colorScheme.primary,
-              ),
-              Text(
-                '°F',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: _unit == 'imperial'
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -159,6 +143,7 @@ class _MainScreenState extends State<MainScreen> {
                                   _controller.clear();
                                   _errorText = null;
                                   _weatherData = null;
+                                  _lastCity = null;
                                 });
                               },
                             )
@@ -232,11 +217,46 @@ class _MainScreenState extends State<MainScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  '${_weatherData!.getTemperature(_unit).toStringAsFixed(1)}${_weatherData!.getTemperatureUnit(_unit)}',
-                                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
+                                  '${_lastCity!.name}, ${_lastCity!.country}',
+                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                         color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
                                       ),
+                                ),
+                                const SizedBox(height: 16.0),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '${_weatherData!.getTemperature(_unit).toStringAsFixed(1)}${_weatherData!.getTemperatureUnit(_unit)}',
+                                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.primary,
+                                          ),
+                                    ),
+                                    const SizedBox(width: 16.0),
+                                    Text(
+                                      '°C',
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: _unit == 'metric'
+                                                ? Theme.of(context).colorScheme.primary
+                                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                    Switch(
+                                      value: _unit == 'metric',
+                                      onChanged: _toggleUnit,
+                                      activeColor: Theme.of(context).colorScheme.primary,
+                                    ),
+                                    Text(
+                                      '°F',
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: _unit == 'imperial'
+                                                ? Theme.of(context).colorScheme.primary
+                                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8.0),
                                 Text(
@@ -258,7 +278,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
               Container(
-                height: 150,
+                padding: const EdgeInsets.only(bottom: 16.0),
                 alignment: Alignment.bottomCenter,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 500),
@@ -276,7 +296,6 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     width: 100,
                     height: 100,
-                    
                   ),
                 ),
               ),
