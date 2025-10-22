@@ -17,7 +17,12 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2, // Incremented from 1 to 2
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
   }
 
   Future _createDB(Database db, int version) async {
@@ -27,6 +32,32 @@ class DatabaseHelper {
         unit TEXT NOT NULL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE cities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        country TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        population INTEGER
+      )
+    ''');
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE cities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          country TEXT NOT NULL,
+          latitude REAL NOT NULL,
+          longitude REAL NOT NULL,
+          population INTEGER
+        )
+      ''');
+      print('Upgraded database to version $newVersion: created cities table');
+    }
   }
 
   Future<void> saveUnitPreference(String unit) async {
@@ -46,6 +77,31 @@ class DatabaseHelper {
     }
     print('No unit preference found, defaulting to metric');
     return 'metric';
+  }
+
+  Future<void> saveLastCity(CitySuggestion city) async {
+    final db = await database;
+    await db.delete('cities'); // Clear previous city
+    await db.insert('cities', {
+      'name': city.name,
+      'country': city.country,
+      'latitude': city.lat,
+      'longitude': city.lon,
+      'population': city.population,
+    });
+    print('Saved city: ${city.name}, ${city.country}');
+  }
+
+  Future<CitySuggestion?> getLastCity() async {
+    final db = await database;
+    final maps = await db.query('cities', limit: 1);
+    if (maps.isNotEmpty) {
+      final city = CitySuggestion.fromJson(maps.first);
+      print('Retrieved city: ${city.name}, ${city.country}');
+      return city;
+    }
+    print('No city found in database');
+    return null;
   }
 
   Future<void> close() async {
