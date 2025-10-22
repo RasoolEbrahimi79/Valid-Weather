@@ -19,7 +19,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 2, // Incremented from 1 to 2
+      version: 2,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -47,7 +47,7 @@ class DatabaseHelper {
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('''
-        CREATE TABLE cities (
+        CREATE TABLE IF NOT EXISTS cities (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           country TEXT NOT NULL,
@@ -56,7 +56,7 @@ class DatabaseHelper {
           population INTEGER
         )
       ''');
-      print('Upgraded database to version $newVersion: created cities table');
+      print('Upgraded database to version $newVersion: ensured cities table exists');
     }
   }
 
