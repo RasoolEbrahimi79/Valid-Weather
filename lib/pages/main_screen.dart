@@ -102,6 +102,7 @@ class _MainScreenState extends State<MainScreen> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                SizedBox(height: 4,),
                 TypeAheadField<CitySuggestion>(
                   controller: _controller,
                   focusNode: _focusNode,
